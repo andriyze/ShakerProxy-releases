@@ -103,8 +103,21 @@ DHCP, NAT or routing of its own: devices keep the router's addressing and need
 no setup. See [Inline bridge](bridge-mode.md). One-NIC VLAN plans derive two
 validated subinterfaces from the same stable physical identity and render owned
 `vlans` entries. Passive sensor plans contain no WAN, routing, NAT, or DHCP
-mutation; this release does not record their mirror port yet, because
-recording needs a lab interface.
+mutation: they write only the mirror's Netplan entry (no address) and
+silence the mirror (up, ARP and IPv6 off, promiscuous). The confirmed plan
+puts the gateway in observing mode, `PASSIVE_OBSERVING`: the mirror port is
+recorded and analyzed, and nothing is routed, redirected or enforced (see
+[Passive mirror](protocol-support.md#passive-mirror)). The gateway's state
+file keeps `ROUTED_PASSTHROUGH` beside the passive plan, which every release
+reads; an earlier release rolled back to starts, treats the plan as routing
+nothing and recording nothing, and leaves the mirror silenced until it is
+changed, the plan is turned off or the host reboots. The transaction keeps
+the mirror's previous flags in its own `mirror-link.json`, which the
+watchdog's rollback and `network off` restore; earlier releases ignore that
+file. A passive plan's WAN health check means "the host kept its default
+route, not through the mirror" and its IPv4 forwarding check "the mirror is
+silent"; both must pass, so an earlier release accepts the confirmed
+transaction.
 
 ## What lab devices can reach on ShakerProxy
 

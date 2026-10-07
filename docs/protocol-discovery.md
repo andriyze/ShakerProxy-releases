@@ -38,27 +38,58 @@ stored with:
 
 | Evidence | Meaning | How much to trust it |
 |---|---|---|
-| `ANALYZER` | Zeek, Suricata or the interception proxy recognized the protocol from the payload | High |
-| `PORT_HEURISTIC` | Only a well-known port matched (e.g. TCP 1883 → MQTT) | Medium – any program can use any port |
+| `ANALYZER` | Zeek, Suricata or the interception proxy recognized the protocol itself from the payload | High – the only payload-confirmed level |
+| `CARRIER_AND_PORT` | An analyzer confirmed only the carrier (TLS, QUIC, DNS wire format, HTTP, or the COTP session layer) and the well-known port named the application inside it: TLS on TCP 853 → DNS over TLS, TLS on TCP 5228 → Google push, QUIC on UDP 853 → DNS over QUIC, DNS on UDP 5353 → mDNS, COTP alone on TCP 102 → S7 | Medium – the carrier is certain, the application is the port's guess |
+| `PORT_HEURISTIC` | Only a well-known port matched (e.g. TCP 1883 → MQTT) | Low to medium – any program can use any port |
 | `UNCLASSIFIED` | Neither matched; the flow is reported as `unknown-tcp`, `unknown-udp` or `unknown` | It is a coverage gap, not a protocol |
 
-A protocol's evidence in a summary is the strongest evidence seen for it.
+A protocol's evidence in a summary is the strongest evidence seen for it, in
+the order above. Device reports, findings, the UI ("Port on confirmed
+carrier"), the CLI and MCP never present `CARRIER_AND_PORT` as confirmed: a
+finding's evidence line says "carrier confirmed by protocol analysis,
+application identified by port number".
 
 ## Reading visibility and coverage
 
 | Visibility | What ShakerProxy can see | Typical examples |
 |---|---|---|
 | `DECRYPTED` | Everything: ShakerProxy intercepted and decrypted it | HTTPS with the ShakerProxy CA installed |
-| `CLEARTEXT` | The protocol is readable on the wire | HTTP, MQTT, DNS, Telnet, Modbus |
+| `CLEARTEXT` | The protocol is readable on the wire | HTTP, MQTT, DNS, Telnet, Modbus (what an industrial device is asked to do: [industrial protocols](industrial-protocols.md)) |
 | `ENCRYPTED_METADATA` | Encrypted, but the handshake shows who it talks to (SNI, certificates, ALPN) | TLS that was not decrypted, QUIC, SSH, MQTT over TLS |
 | `OPAQUE` | Nothing useful: tunnels, proprietary binary protocols, unidentified traffic | WireGuard, Tuya, TeamViewer, `unknown-udp` |
+| `UNKNOWN` | Security unknown: the protocol chooses per connection whether to encrypt, and nothing observed showed which | OPC UA (security mode None, Sign or SignAndEncrypt), SMTP/IMAP/POP3/LDAP/XMPP/FTP before STARTTLS is seen, MySQL, PostgreSQL, SMB, VNC, SNMP |
+
+Protocol identity is not a security property. The catalog gives a fixed
+visibility only where the protocol's definition fixes it (HTTP is cleartext,
+TLS and everything wrapped in it is encrypted, WireGuard is opaque). A
+protocol that negotiates encryption in-band on its usual port starts as
+`UNKNOWN`, and what the connection shows replaces it: an analyzer that saw the
+TLS session a STARTTLS command started (`smtp,ssl`) makes it
+`ENCRYPTED_METADATA`, a confirmed DTLS carrier does the same for LwM2M, and an
+OPC UA security mode observed on the connection makes `None` and `Sign`
+`CLEARTEXT` (signed messages are readable) and `SignAndEncrypt`
+`ENCRYPTED_METADATA`. The mode comes from the OT analyzer profile's secure
+channel records ([industrial protocols](industrial-protocols.md)): that record
+carries the mode's visibility itself, and protocol discovery and device
+reports match each OPC UA connection record to the secure channel record of
+the same connection (client and server address and port, within ten minutes;
+the least protected mode wins if there are several). The connection record
+on the Traffic page keeps `UNKNOWN`, because ingest classifies one record at
+a time. Chromecast's TCP 8008 is the cleartext DIAL/HTTP service
+(`dial`); only TCP 8009 is the encrypted Cast channel.
 
 `coverage` adds up the **bytes of counted flows** by visibility:
 
 ```json
 "coverage": {"total_bytes": 14048, "decrypted_bytes": 9000, "cleartext_bytes": 3000,
-             "encrypted_metadata_bytes": 0, "opaque_bytes": 2048, "opaque_percent": 14.6}
+             "encrypted_metadata_bytes": 0, "opaque_bytes": 2048, "unknown_bytes": 0,
+             "opaque_percent": 14.6}
 ```
+
+`decrypted_flows` on each protocol counts the flows ShakerProxy decrypted, each
+matched to its own interception. A protocol reads `DECRYPTED` only when every
+flow was decrypted; a device with one decrypted and one undecrypted HTTPS
+server shows TLS as `ENCRYPTED_METADATA` with `decrypted_flows` 1 of 2.
 
 A high `opaque_percent` means the device moves data ShakerProxy cannot inspect;
 look at the `OPAQUE` protocols (`protocol.visibility:OPAQUE`) first. Coverage
@@ -82,7 +113,10 @@ the interception proxy. Protocol discovery counts each connection **once**:
    bypassed, failed) is one connection. It counts as a flow only when no passive
    flow has the same 5-tuple within ten minutes; otherwise it only upgrades
    that flow's visibility.
-3. **Everything else is evidence.** DNS, HTTP, TLS-handshake, QUIC, MQTT and
+3. **Observed security.** An OPC UA secure channel record upgrades the
+   `UNKNOWN` visibility of the passive flow with the same 5-tuple within ten
+   minutes to the security mode it saw; it adds no flow.
+4. **Everything else is evidence.** DNS, HTTP, TLS-handshake, QUIC, MQTT and
    other application-layer records, Suricata alerts, and interception HTTP and
    DNS-over-HTTPS records make a protocol appear (with `events`, devices, first
    and last seen) but never add flows or bytes.
@@ -113,12 +147,12 @@ GET /api/v1/protocols/catalog
  "protocols":[{"protocol":"mqtt","label":"MQTT","category":"iot-messaging",
    "visibility":"CLEARTEXT","evidence":"ANALYZER","exotic":true,"novel":true,
    "description":"Lightweight IoT publish/subscribe messaging.",
-   "flows":12,"bytes":3456,"events":20,"device_count":1,
+   "flows":12,"bytes":3456,"decrypted_flows":0,"events":20,"device_count":1,
    "devices":[{"device_id":"device-…","device_name":"Bench camera","flows":12,"bytes":3456,"last_seen":"…"}],
    "unattributed_flows":0,"first_seen":"…","last_seen":"…",
    "ports":[{"transport":"tcp","port":1883,"flows":12}]}],
  "coverage":{"total_bytes":3456,"decrypted_bytes":0,"cleartext_bytes":3456,
-   "encrypted_metadata_bytes":0,"opaque_bytes":0,"opaque_percent":0},
+   "encrypted_metadata_bytes":0,"opaque_bytes":0,"unknown_bytes":0,"opaque_percent":0},
  "sources":["ZEEK","MITMPROXY"],"truncated":false}
 ```
 
@@ -277,7 +311,21 @@ per host/service.
 - **No capture, no passive view.** Without a running capture only intercepted
   HTTPS, HTTP and DNS-over-HTTPS are visible.
 - **Ports can lie.** `PORT_HEURISTIC` means "it used MQTT's port", not "it spoke
-  MQTT". Treat it as a lead.
+  MQTT". Treat it as a lead. `CARRIER_AND_PORT` means "it spoke TLS on DNS over
+  TLS's port", not "it sent DNS".
+- **Rolling back maps the new values.** Releases before 0.1.0-beta.43 refuse
+  events with `UNKNOWN` visibility or `CARRIER_AND_PORT` evidence. Before
+  `shakerproxy rollback` (or a failed update that puts such a release back)
+  starts one, the installer rewrites them in bounded batches to `OPAQUE` and
+  `PORT_HEURISTIC` and marks those events for re-projection, so the next
+  upgrade classifies the last 30 days truthfully again (protocol columns and
+  the [industrial projection](industrial-protocols.md) alike). A downgrade with
+  `shakerproxy update --version <older>` runs the older installer, which
+  cannot do this; use rollback.
+- **The cloud summary is coarser.** The optional cloud connector's hourly
+  protocol summary has no `CARRIER_AND_PORT` or `UNKNOWN`: carrier-and-port
+  flows count as `PORT_HEURISTIC` and unknown security is sent as `OPAQUE`,
+  so neither is ever reported there as confirmed or encrypted.
 - **Encrypted is not decrypted.** QUIC, TLS that was not intercepted, SSH, VPNs
   and proprietary tunnels show who a device talks to, not what it says. QUIC
   cannot be intercepted; block UDP/443 so apps fall back to TCP.

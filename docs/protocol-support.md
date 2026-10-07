@@ -14,9 +14,12 @@ missing here.
 
 ## Routing modes
 
-Each mode except the passive mirror gets the same recording, DNS forwarding,
-live connection events and per-device controls for the traffic that crosses
-ShakerProxy. The modes differ in which traffic crosses it.
+Each routed mode gets the same recording, DNS forwarding, live connection
+events and per-device controls for the traffic that crosses ShakerProxy. The
+modes differ in which traffic crosses it. The passive mirror crosses nothing:
+it records and analyzes a copy, so it has the recording, live analysis and
+device discovery, and none of the forwarding, live connection events or
+controls.
 
 | Mode | Plan | How a device joins | What crosses ShakerProxy | Ways around it (coverage findings) |
 |---|---|---|---|---|
@@ -25,7 +28,26 @@ ShakerProxy. The modes differ in which traffic crosses it.
 | Single-arm | `SINGLE_ARM` | Is set by hand to use ShakerProxy as its gateway and DNS server | That device's traffic, plus every device's multicast and broadcast on the shared network (mDNS, SSDP, DHCP, router advertisements) | Devices that keep the router's DHCP; unicast between two devices; IPv6 unless it is off on the device |
 | Inline bridge | `TRANSPARENT_BRIDGE` ([guide](bridge-mode.md)) | Is cabled through ShakerProxy; keeps the router's DHCP, gateway and DNS | Every frame between the device port and the router side, DHCP and IPv6 router advertisements included | Two devices behind one switch on the device port |
 | WireGuard VPN | VPN mode, on its own or beside any of the above ([guide](vpn-mode.md)) | Scans a QR code in the WireGuard app | The device's entire connection, from any network, in its own "VPN traffic" recording | None for the tunnel; local discovery on the device's own Wi-Fi does not enter it |
-| Passive mirror | `PASSIVE_SENSOR` | A switch mirror or TAP | Nothing yet. The plan changes no host networking; recording, DNS forwarding and connection events need a lab interface, which a passive plan does not have, so this release shows nothing from the mirror port | Everything |
+| Passive mirror | `PASSIVE_SENSOR` ([below](#passive-mirror)) | Nothing on the device: the switch's mirror (SPAN) session or a TAP copies its port or VLAN to ShakerProxy's mirror port | Nothing crosses it. Everything the switch copies is recorded (VLAN tags kept) and analyzed by Zeek (live) and Suricata, and devices are found by MAC from ARP, IPv6 neighbor discovery and DHCP. No DNS answers, no live connection events (no traffic is routed), no HTTPS decryption, no blocking or device controls | Ports and VLANs the mirror session leaves out; traffic between two devices behind one switch port; a switch that drops copies under load |
+
+### Passive mirror
+
+A confirmed passive plan puts the gateway in observing mode
+(`PASSIVE_OBSERVING` in `shakerproxy status`, the API and MCP). The mirror
+port is silenced and opened: up, ARP and IPv6 off, no address and no route,
+so the host sends nothing on it (the netlab proof checks its TX counter and
+the far side), and promiscuous, so it receives frames addressed to other
+hosts. The automatic recording records it like a lab interface, with every
+frame and no filter; live Zeek and Suricata analyze it as they do the lab
+recording, and gatewayd learns each device's MAC and address from the ARP,
+neighbor discovery and DHCP acknowledgements in the recording, so Traffic,
+Devices and reports name the devices without ShakerProxy's DHCP (with
+automatic recording turned off, no devices are learned). Forwarding, the
+firewall, NAT, DHCP and router advertisements are never touched. Emergency
+bypass has nothing to bypass while observing: turning it on keeps the mirror
+recorded. Visibility health adds a *Mirror port* signal: link, packets seen,
+kernel drops, devices learned, live analysis lag and anything else sending on
+the port.
 
 DNS sent over IPv6 is answered by ShakerProxy where the lab routes IPv6 (see
 [IPv6 in the lab](ipv6.md)) and, on an inline bridge, when ShakerProxy has an
@@ -49,6 +71,7 @@ IPv6 address on the bridge; otherwise it is recorded but not answered.
 | NTP | `ntp` | `ntp` | Connection at once; NTP record within about a second | Cleartext |
 | mDNS / Bonjour | `mdns` | `mdns` | Within seconds from live analysis (multicast is not a connection) | Names and services announced. Not seen for VPN devices |
 | SSDP / UPnP | `ssdp` | `ssdp` | Within seconds from live analysis | Search and announcement headers. Not seen for VPN devices |
+| Industrial: Modbus, DNP3, EtherNet/IP and CIP, S7comm, OPC UA | No probe: the OT recordings and `make ot-smoke` ([industrial protocols](industrial-protocols.md#fixtures-and-proof)) | The industrial projection: operation, whether it changes state, the device's answer; Modbus and DNP3 always, the others with the OT analyzer profile, otherwise port labels | Connection at once where traffic is routed; records within about a second from live analysis (live Zeek uses the profile) | What a device is asked to do and how it answers, never process values. OPC UA is cleartext unless its secure channel was opened with SignAndEncrypt; the visibility is the observed security mode, `UNKNOWN` when none was seen |
 | DHCPv4 | No probe | Lease evidence: hostname, vendor, MAC ([device inventory](device-inventory.md)) | Device list on the next inventory refresh | Cleartext. ShakerProxy's own leases in routed labs; the router's are recorded in single-arm and bridge labs |
 | Wi-Fi management frames | No probe: the virtual test lab has no radio | `wifi.*`: networks searched for, joins, roaming, disconnect reasons ([Wi-Fi visibility](wifi-visibility.md)) | Within seconds | Frame metadata only; needs a monitor-capable adapter |
 

@@ -95,7 +95,15 @@ managed state, host inspection and DNS policy, plus the last 24 hours of recorde
 | Local discovery | Never. Every lab records multicast discovery: a single-arm recording keeps every device's mDNS, SSDP, LLMNR, NetBIOS and DHCP on the shared network, and an inline bridge records every multicast frame crossing it. Unicast between two devices is the device-to-device finding |
 | VPN devices | Never while VPN mode is on: a full tunnel has no way around ShakerProxy. UNKNOWN until a device is added |
 | Device discovery | A source of device evidence failed on the last inventory refresh: ShakerProxy's DHCP lease file could not be used (or is missing or unreadable in a lab where ShakerProxy hands out addresses), the gateway's ARP and NDP tables failed validation, or the observed DHCP or lab presence could not be read. UNKNOWN when only some lease records were skipped. The details are `device_discovery` in the overview |
-| Not routing | No confirmed lab routes traffic and VPN mode is off |
+| Not routing | No confirmed lab routes traffic, no passive sensor observes, and VPN mode is off |
+| Passive mirror: only copied traffic | Always while a passive sensor observes (`mirror-only`): only what the switch or TAP copies to the mirror port is seen, and nothing is routed, redirected, decrypted or blocked. Ports and VLANs the mirror session leaves out, traffic between two devices behind one switch port and HTTPS content are not seen. It replaces the routed lab's findings; device discovery and VPN still report |
+
+On a passive sensor the coverage check itself does not run: its probes need
+ShakerProxy to route them. The mirror's path is covered by the netlab proof
+(`tests/netlab/passive-sensor.sh`) and, live, by visibility health's *Mirror
+port* signal (link, packets seen, kernel drops, devices learned, live
+analysis lag, packets something else sends on the port) beside the
+recording, analyzer and storage signals.
 
 ## Gaps found on the current test lab
 

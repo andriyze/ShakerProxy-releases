@@ -122,8 +122,24 @@ The report contains:
   known services (for example `samsungacr.com` → Samsung, telemetry).
 - `protocols`: application protocols identified from Zeek/Suricata analyzer
   results and well-known ports, with how visible each is (`DECRYPTED`,
-  `CLEARTEXT`, `ENCRYPTED_METADATA`, `OPAQUE`), how it was identified
-  (`ANALYZER` or `PORT_HEURISTIC`), and whether it is unusual (`exotic`).
+  `CLEARTEXT`, `ENCRYPTED_METADATA`, `OPAQUE`, or `UNKNOWN` when the protocol
+  picks its security per connection, as OPC UA and STARTTLS do, and none was
+  observed), how it was identified (`ANALYZER`, the only payload-confirmed
+  level; `CARRIER_AND_PORT` when an analyzer confirmed only the TLS, QUIC, DNS
+  or HTTP carrier and the port named the application, such as TLS on TCP 853
+  read as DNS over TLS; or `PORT_HEURISTIC`), and whether it is unusual
+  (`exotic`). `decrypted_flows` and `decrypted_bytes` count the connections
+  ShakerProxy decrypted. Each passive connection record is matched to an
+  interception of that same connection (client and server address and port,
+  transport, within ten minutes) before it is grouped, so decrypting one HTTPS
+  server never marks another server on TCP 443 as decrypted. `visibility` is
+  `DECRYPTED` only when every connection was; otherwise it describes the
+  connections that were not, and `flows - decrypted_flows` says how many.
+  An OPC UA connection record is matched the same way to the OPC UA secure
+  channel record of that connection ([industrial protocols](industrial-protocols.md)):
+  security mode None or Sign makes it `CLEARTEXT`, SignAndEncrypt
+  `ENCRYPTED_METADATA`, and without one it stays `UNKNOWN`.
+  See [protocol discovery](protocol-discovery.md) for the evidence levels.
 - `tls`: decrypted, passed-through, and failed HTTPS connections, likely
   pinning, failed and decrypted hosts, and legacy versions (SSL, TLS 1.0/1.1)
   per host.

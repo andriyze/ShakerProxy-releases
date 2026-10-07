@@ -37,12 +37,13 @@ The first rule that matches decides.
 | 3 | dns | Encrypted DNS the classifier identified: app protocol `doh`, `dot` or `doq` |
 | 4 | quic / tls / http / other | A connection the gateway reported as it opened (`shakerproxy.conn`): UDP to 443 or with a server name is QUIC, TCP to 443 or with a server name is TLS, TCP to 80 is HTTP, anything else is other |
 | 5 | alert | A Suricata alert, or a transition of ShakerProxy's own detector (HOST `shakerproxy.detection.*`: an unapproved DHCP server or router advertisement, gateway spoofing, clock drift, capture loss, resource pressure); see [native detections](native-detections.md) |
-| 6 | discovery | Local discovery: destination port 5353 (mDNS), 5355 (LLMNR), 1900 (SSDP), 137/138 (NetBIOS), 67/68 (DHCP), 546/547 (DHCPv6), 3702 (WS-Discovery) or 10001 (Ubiquiti); a `zeek.dhcp` record; or the protocol classifier's `local-discovery` category or a discovery/DHCP app protocol |
-| 7 | dns | A name lookup (`dns_query` set) |
-| 8 | http | A web request (method or host set, or an `*.http` record) |
-| 9 | quic | A QUIC record, or a UDP connection with a server name |
-| 10 | tls | A connection with a server name, or a TLS handshake record |
-| 11 | other | Everything else: unnamed TCP/UDP, ICMP, and other protocols |
+| 6 | industrial | An industrial protocol record (it has an industrial projection: Modbus, DNP3, EtherNet/IP and CIP, S7comm, OPC UA), or traffic an analyzer, not just its port, identified as an industrial protocol (`protocol_category` industrial with `ANALYZER` evidence); see [industrial protocols](industrial-protocols.md) |
+| 7 | discovery | Local discovery: destination port 5353 (mDNS), 5355 (LLMNR), 1900 (SSDP), 137/138 (NetBIOS), 67/68 (DHCP), 546/547 (DHCPv6), 3702 (WS-Discovery) or 10001 (Ubiquiti); a `zeek.dhcp` record; or the protocol classifier's `local-discovery` category or a discovery/DHCP app protocol |
+| 8 | dns | A name lookup (`dns_query` set) |
+| 9 | http | A web request (method or host set, or an `*.http` record) |
+| 10 | quic | A QUIC record, or a UDP connection with a server name |
+| 11 | tls | A connection with a server name, or a TLS handshake record |
+| 12 | other | Everything else: unnamed TCP/UDP, ICMP, and other protocols, including traffic only a port suggests is industrial |
 
 Events from a router's own logs (source `NETWORK_GEAR`) are sorted right after
 rule 1: a Wi-Fi client log is wifi, an IDS alert is alert, a DHCP lease is
@@ -64,8 +65,8 @@ conditions on stored columns. That selects exactly the events the CASE gives
 `x` (`TestPostgresStreamTypePredicatesMatchTheClassification` checks every
 type, negated too, against the CASE), and lets PostgreSQL estimate it and use
 an index: a common type reads the newest events in time order until it has a
-page, and Wi-Fi, alerts and web requests, usually a small share of the
-history, read their own partial index. On 2,000,000 stored events each chip
+page, and Wi-Fi, alerts, web requests and industrial traffic, usually a small
+share of the history, read their own partial index. On 2,000,000 stored events each chip
 answers in well under a second.
 
 ## Analyzer duplicates

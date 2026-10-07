@@ -48,6 +48,7 @@ beyond those records.
 - [TLS interception, certificate onboarding, and bypass](tls-interception.md)
 - [Protocol discovery](protocol-discovery.md)
 - [Traffic stream types](traffic-stream-types.md)
+- [Industrial protocols (OT)](industrial-protocols.md)
 - [Visibility coverage check](testing/visibility-coverage.md)
 - [Capture, analysis, retention, and deletion](capture-and-storage.md)
 - [Device inventory and correction](device-inventory.md)
