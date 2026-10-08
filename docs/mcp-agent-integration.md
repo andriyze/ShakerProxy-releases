@@ -542,7 +542,10 @@ They are policy deviations, not vulnerabilities. Each finding has its
 controller, peer, protocol, operation, first and last time, count,
 `record_ids` (open them with `event_detail`; `capture_session_id`, `client`
 and `server` locate the packets), a `traffic_query` for all of its records,
-why it is flagged and how to accept it. Input: `device` (optional, one
+why it is flagged and how to accept it. When a bound was reached the result
+says so: `partial`, `capped` (each bound and its limit), `partial_note` and a
+"Partial:" sentence in the summary; `controllers_omitted` counts controllers
+beyond the 50 listed. Input: `device` (optional, one
 controller), `window` or `session`, `rule` (optional). Scopes: `devices:read`
 and `traffic:read`.
 
