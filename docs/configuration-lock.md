@@ -11,7 +11,9 @@ The lock covers:
   independent watchdog rollback;
 - application install, update, exact-version repair, application rollback, and
   uninstall;
-- host capture-service start and stop; and
+- host capture-service start and stop;
+- analyzer profile switches and OT parser pack activations and rollbacks
+  (category `analyzer`), which restart the analyzers; and
 - the reserved DNS enforcement, restore, and signed-ruleset mutation categories
   that future implementations must acquire before changing host state.
 

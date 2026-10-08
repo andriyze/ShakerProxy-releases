@@ -76,6 +76,8 @@ The API itself returns every record and leaves the view to its caller.
 | Cases: case list, evidence, timeline, hold | `GET /api/v1/agent/cases`, `/agent/cases/{caseID}` (full records: `/cases`) | `cases:read` | `cases` | - |
 | Network-gear (UniFi) log collector: on/off, listen, allowlist, counts (Integrations page) | `GET /api/v1/integrations/syslog-collector` (config: `PUT`, session + password) | `system:read` | `syslog_collector` (read-only) | `syslog` |
 | Notifications: recent alerts and the unread count (Integrations page) | `GET /api/v1/notifications` (configuration: `/integrations/notifications`, session + password) | `system:read` | `notifications` (read-only) | `alerts` |
+| OT policy findings: unexpected writes, program transfers and start/stop, new peers, identity changes, weak OPC UA security (device report's OT section, Policy → OT) | `GET /api/v1/ot/findings` | `devices:read` + `traffic:read` | `ot_findings` | `ot findings` |
+| OT policy: allowed sources, maintenance windows, OPC UA minimum, baseline (Policy → OT) | `GET /api/v1/ot/policy` (change: `PUT /api/v1/ot/policy`, `POST /api/v1/ot/policy/actions`, `lab:write`) | `devices:read` | `ot_policy` (read-only) | `ot policy` |
 
 ## Gaps closed with this page
 

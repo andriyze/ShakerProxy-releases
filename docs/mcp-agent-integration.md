@@ -242,7 +242,7 @@ stdout is the MCP transport. Diagnostics belong on stderr.
 
 ## 7. Implemented tools
 
-28 tools, all read-only (see [API and MCP parity](api-mcp-parity.md) for
+30 tools, all read-only (see [API and MCP parity](api-mcp-parity.md) for
 how they map to the Web UI and the API). `shakerproxy-mcp help` lists them from
 the server's own registration, and `make registry-check` fails when this page
 misses one or counts them wrong. Every tool is annotated `readOnlyHint: true`,
@@ -530,6 +530,29 @@ flagged domain, security alert) with the unread count, from
 `GET /api/v1/notifications`. Each states what happened and the subject, never
 a secret value; configuring channels and rules stays in the Web UI, CLI and
 API. Input: `{}`. Scope: `system:read`.
+
+### `ot_findings`
+
+OT (industrial) policy findings, from `GET /api/v1/ot/findings`: writes from
+sources the OT policy does not allow, program transfers and controller
+start/stop outside a maintenance window, new peers of a controller after its
+baseline, controller identity or firmware changes, and OPC UA security below
+the policy minimum ([industrial protocols](industrial-protocols.md#ot-policy-findings)).
+They are policy deviations, not vulnerabilities. Each finding has its
+controller, peer, protocol, operation, first and last time, count,
+`record_ids` (open them with `event_detail`; `capture_session_id`, `client`
+and `server` locate the packets), a `traffic_query` for all of its records,
+why it is flagged and how to accept it. Input: `device` (optional, one
+controller), `window` or `session`, `rule` (optional). Scopes: `devices:read`
+and `traffic:read`.
+
+### `ot_policy`
+
+The OT policy, read-only, from `GET /api/v1/ot/policy`: allowed sources,
+maintenance windows, OPC UA minimum and baseline learning period, globally
+and per controller, with the accepted peers and identities. Changing it stays
+in the Web UI (Policy → OT) and the API (`lab:write`). Input: `{}`. Scope:
+`devices:read`.
 
 ### Renamed tools
 

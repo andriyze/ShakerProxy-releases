@@ -36,6 +36,13 @@ records `AUTO_ROLLED_BACK`. A manual rollback whose target fails health restores
 the original revision too. This behavior is covered with real signatures and
 valid Suricata fixtures.
 
+A fourth kind, `OT_PARSER_PACK`, is a prebuilt OT parser pack for the Zeek
+analyzer. It is verified by the same code, but activated, proven and rolled
+back by `shakerproxy analyzer pack`, which restarts the analyzers and keeps
+its own state file; `rules update` refuses it, and `state.json` never names
+it, so earlier releases still read `state.json` after a rollback
+([industrial protocols](industrial-protocols.md#signed-parser-packs)).
+
 The packaged CLI currently performs signature and native structural validation
 and stores revisions, but it does not yet restart the Compose consumer. It
 therefore reports `VALIDATED_PENDING_RELOAD`, never `HEALTHY`. Clean-VM engine

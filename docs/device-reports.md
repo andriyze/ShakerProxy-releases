@@ -172,6 +172,14 @@ Findings are raised only from observed evidence. Each has a stable `id`, a
 Findings are sorted by severity. Protocol findings say whether the protocol
 was identified by protocol analysis or by port number only.
 
+A device with industrial activity as a controller also gets the OT policy
+findings: one summary finding per OT rule (`ot-program-or-control`,
+`ot-unexpected-state-change`, `ot-new-peer`, `ot-identity-changed`,
+`ot-opcua-security-below-policy`) among the findings above, and the full
+findings, each with its records and accept action, in the report's `ot`
+section. They are policy deviations, not vulnerabilities; see
+[OT policy findings](industrial-protocols.md#ot-policy-findings).
+
 ## 5. CA trust
 
 Whether a decrypted HTTPS connection is expected or a vulnerability depends on

@@ -11,6 +11,26 @@ maintenance brokers without opening a host port, reports fresh idle, actively
 scanning, and stale states, and isolates a failed engine behind a generic
 unavailable result. The dashboard refreshes this report every 30 seconds and
 shows bounded completed-capture/event totals plus Suricata ruleset provenance.
+Each snapshot also carries `parsers`, what the analyzer loaded when it
+started: the configured and the running analyzer profile and, for Zeek, the
+OT parser pack it verified and the ICSNPP plugins Zeek registered from it
+([industrial protocols](industrial-protocols.md#what-the-analyzers-report)).
+
+## Analyzer profile
+
+`shakerproxy analyzer profile` prints the configured profile (standard or ot)
+and what Zeek and Suricata run; reading what they run needs root, because
+their state is root's. `shakerproxy status` shows it on the **Analyzer
+profile** line (`ot · parser pack builtin, 3 OT plugins`), with "not applied
+to every analyzer" in yellow when an analyzer does not run the configured
+profile. `sudo shakerproxy doctor` adds an `analyzer_profile` check after the
+host checks: `PASS` when both analyzers run the configured profile, `WARNING`
+when one does not or reports a parser problem (the observations say which
+and how to apply it again), `FAIL` when the setting file is invalid; without
+root it is left out. `GET /api/v1/analyzers/profile` and the System page's
+**Analyzer profile** panel show the same and the latest switch. When an
+analyzer runs another profile than the configured one, the visibility health
+signal of that analyzer is `DEGRADED`.
 
 ## Visibility health
 
@@ -27,8 +47,13 @@ signal per part of the path from packets to Traffic:
 - live connection and blocked encrypted-DNS events: whether each runs, its
   kernel buffer overruns and the events the spool could not take;
 - live analysis: its lag and the records it could not confirm delivered;
-- Zeek and Suricata: stopped, segments skipped over the analysis budget, and
-  segments the recording removed before analysis (missed);
+- Zeek and Suricata: stopped, segments skipped over the analysis budget,
+  segments the recording removed before analysis (missed), and an analyzer
+  that runs another analyzer profile than the configured one (the industrial
+  parsers did not load); each signal's detail names the profile it runs and,
+  for Zeek with the OT profile, its parser pack and plugins, and the report's
+  `analyzers` carry `profile`, `configured_profile`, `parser_pack`,
+  `ot_plugins` and `parser_error`;
 - event storage: drain lag, a paused drain, the database, quarantine, and the
   event database's disk (low space, history deleted early, or a disk filled
   by something else, which is a gap);

@@ -12,7 +12,7 @@ rule.
 | Bypassing device | A device's traffic does not go through ShakerProxy (so its connections cannot be seen). |
 | Cleartext exposure | A device sends a credential or secret in the clear over plaintext HTTP. |
 | Flagged domain | A device contacts a domain on the bundled advertising/tracking/telemetry list. |
-| Security alert | A Suricata alert or another native detection fires. |
+| Security alert | A Suricata alert or another native detection fires; and, when the OT policy's *Notify about new OT findings* is on, an OT policy finding (kind `ot.<rule>`, see [OT policy findings](industrial-protocols.md#ot-policy-findings)). |
 
 Cleartext exposures, security alerts and flagged domains come from the
 recorded traffic: every 30 seconds ShakerProxy reads the detections, Suricata
