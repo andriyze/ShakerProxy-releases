@@ -94,7 +94,7 @@ health show any analyzer that does not run the configured profile. The package
 writes the file with `standard` once and never changes it after; a file
 holding anything else stops package configuration with a message saying so,
 and an analyzer that cannot read it refuses to start. Both the
-segment-by-segment analysis and the live Zeek pick it up. Recordings already
+segment-by-segment analysis and live Zeek and Suricata pick it up. Recordings already
 analyzed are not analyzed again. For development, the analyzer containers also
 read `SHAKERPROXY_ANALYZER_PROFILE=ot` from their environment
 (`deploy/compose.dev.yaml` passes it through).

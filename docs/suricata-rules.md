@@ -32,7 +32,7 @@ the declared inventory.
 4. Run `make verify`. The repository test validates the digest, manifest schema,
    active-line inventory, and unique SIDs.
 5. Build `apps/analyzer-worker/Dockerfile.suricata`. Image construction must pass
-   Suricata 8.0.6 native configuration/rule validation before publication.
+   Suricata 8.0.7 native configuration/rule validation before publication.
 6. Review the rules, provenance manifest, test evidence, and license record in
    the same commit. Publish only through the normal immutable-image release
    process.

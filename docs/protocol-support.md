@@ -59,10 +59,11 @@ IPv6 address on the bridge; otherwise it is recorded but not answered.
 |---|---|---|---|---|
 | Plain DNS (UDP/TCP 53) | `dns-gateway`, `dns-direct`, `dns-ipv6` | `dns`: name, type, answer code and answers | At once: the forwarder records each lookup it answers (`shakerproxy.dns`); other lookups within about a second from live analysis | Names and answers |
 | DNS over TLS | `dot` | `dot` (TCP 853) | Connection within about a second | Encrypted. *Block encrypted DNS* refuses it so devices fall back to plain DNS |
-| DNS over HTTPS | `doh` | `doh`, from the resolver catalog by server name or address | Connection within about a second | Encrypted. *Block encrypted DNS* refuses the catalog's resolvers and their names |
+| DNS over HTTPS | `doh` | `doh`, from the resolver catalog by server name or address | Connection within about a second; a decrypted answer at once (`doh_lookup`) | Encrypted. When HTTPS decryption covers the device, each answer is decoded into a DNS lookup "via DoH (decrypted)" with name, type, answer code and answers ([TLS interception](tls-interception.md#dns-over-https-that-shakerproxy-decrypts)). *Block encrypted DNS* refuses the catalog's resolvers and their names |
 | DNS over QUIC | `doq` | `doq` (UDP 853) | Connection within about a second | Encrypted. *Block encrypted DNS* refuses it |
 | HTTP | `http`, `http-ipv6` | `http`: method, host, path, status | Connection at once; request within about a second | Headers and the start of each body, read from the recording (credentials masked) |
-| HTTPS / TLS | `https`, `https-ipv6` | `tls`: server name, version, certificate | Connection at once; server name within about a second | Encrypted, unless HTTPS decryption is on for a device that trusts the ShakerProxy CA ([TLS interception](tls-interception.md)); apps that pin fail or are passed through |
+| HTTPS / TLS | `https`, `https-ipv6` | `tls`: server name, version, certificate | Connection at once; server name within about a second | Encrypted, unless HTTPS decryption is on for a device that trusts the ShakerProxy CA ([TLS interception](tls-interception.md)); apps that pin fail or are passed through. A ClientHello using ECH shows only the provider's public name: marked "server name hidden (ECH)" and counted as opaque ([ECH](tls-interception.md#encrypted-client-hello-ech)) |
+| WebSocket (`wss://`, and `ws://` with `intercept_http`) | No probe: the add-on's hook tests (`make test-mitm-image`) | `http`: `websocket_session` when a socket opens (host, path, subprotocol, extensions) and closes (close code, who closed it, totals), `websocket_messages` for what it carries ([TLS interception](tls-interception.md#websockets)) | Opening at once; the first 16 messages within about a second; then counts every 10 seconds | On decrypted connections only: direction, type, size and time of each listed message, and with content retention on a 256-byte text preview with credentials masked or a 16-byte hex prefix of a binary message. Ping and pong frames are not counted. On a connection that is not decrypted the socket is the TLS connection it runs in |
 | QUIC / HTTP/3 | `quic`, `quic-ipv6` | `quic`: server name, ALPN, version | Connection at once; server name within about a second | Never decrypted. Blocked for decrypted devices so they fall back to TCP, unless `allow_quic` is on |
 | TCP, any other port | `tcp-unusual-port`, `tcp-ipv6` | The [protocol catalog](protocol-discovery.md) (MQTT, RTSP, Modbus, …) or `other`, with bytes each way | Connection at once | What the protocol carries in cleartext |
 | UDP, any other port | `udp-unusual-port`, `udp-ipv6` | As for TCP | Connection at once | What the protocol carries in cleartext |
@@ -80,8 +81,9 @@ kernel's connection tracking report a lookup or a new connection within about a
 second, whether or not the recording has been analyzed (see
 [connections as they open](dns-forwarding.md#connections-as-they-open)).
 "Within about a second" rows come from Zeek following the automatic lab and
-VPN recordings live; Suricata alerts and manual captures arrive when each
-10-second segment is analyzed (see
+VPN recordings live, and Suricata alerts within a few seconds from live
+Suricata ([live Suricata](protocol-discovery.md#live-suricata)); manual
+captures arrive when each 10-second segment is analyzed (see
 [live analysis](protocol-discovery.md#live-analysis-of-the-lab-recording)).
 
 ## What is never readable
@@ -90,7 +92,10 @@ VPN recordings live; Suricata alerts and manual captures arrive when each
   with mutual TLS or ECH, or sends to a private destination while
   `intercept_private_destinations` is off.
 - Encrypted DNS lookups while *Block encrypted DNS* is off: the resolver is
-  named (`doh`, `dot`, `doq`), the names looked up are not.
+  named (`doh`, `dot`, `doq`), the names looked up are not, except DoH that
+  ShakerProxy decrypts. Firefox's default DoH and iCloud Private Relay stay off
+  on the lab with the canary setting `signal-opt-out`
+  ([DNS forwarding](dns-forwarding.md#encrypted-dns-canaries-firefox-icloud-private-relay)).
 - Traffic inside a VPN or tunnel the device runs itself.
 - Anything that does not cross ShakerProxy (the "ways around it" column);
   the coverage check and `lab_routing` name the devices this applies to.

@@ -169,7 +169,7 @@ final manifests and a bounded feed containing only rotations dumpcap has
 closed. The feed never lists the member dumpcap is still writing; only live
 Zeek reads that one, as a packet stream (below).
 
-The `observe` profile pins Zeek 8.2.1 and Suricata 8.0.6 upstream manifests.
+The `observe` profile pins Zeek 9.0.0 and Suricata 8.0.7 upstream manifests.
 The Suricata image also binds its first-party policy file to a strict provenance
 manifest containing version, source, license, engine version, SHA-256, rule
 count, and reserved SID interval. Repository tests reject hash, inventory,
@@ -189,7 +189,13 @@ recorded rather than hidden. The broker starts with only `SETUID` and
 `SETGID`, then the parser child switches to a UID/GID of its own (from
 2000000000 up; no two running parsers share one) and clears all
 supplementary groups, so one parser cannot open another's descriptors or work
-directory through `/proc`. The parser cannot walk the capture mount, read the
+directory through `/proc`. Without `KILL` the broker cannot signal a
+parser itself, so a parser that must end (its time limit, a live parser
+that hung after its input closed) is killed, with its process group, by a
+short-lived helper (the worker binary in its signal mode) started under that
+parser's own UID and holding the parser's pidfd; waits for a killed parser
+are bounded, so a parser that still does not exit never blocks analysis, and
+its UID returns to the pool only once it has. The parser cannot walk the capture mount, read the
 root-only token copy, or alter root-owned checkpoints. Outputs live in a
 bounded no-execute tmpfs, are revalidated after parsing, and are delivered line
 by line under byte/count limits. A manifest-bound checkpoint is written only
@@ -208,7 +214,10 @@ parser user and sees only that packet stream, so its records reach ingest
 about a second after the packets. A segment it did not stream completely is
 left to the per-segment pass (see
 [live analysis](protocol-discovery.md#live-analysis-of-the-lab-recording)).
-Suricata and manual captures are analyzed per closed segment.
+The Suricata broker follows the same recordings live with one long-running
+Suricata each, so alerts and protocol records reach ingest within a few
+seconds (see [live Suricata](protocol-discovery.md#live-suricata)). Manual
+captures are analyzed per closed segment.
 
 The same authenticated internal maintenance broker exposes a read-only bounded
 health snapshot. The control API polls each engine independently and returns a

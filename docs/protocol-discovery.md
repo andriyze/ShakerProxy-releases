@@ -281,11 +281,64 @@ a segment it hands over this way may appear twice; analyzer health counts
 those segments (`segments_reanalyzed`) and the records it could not deliver
 (`records_dropped`), and reports `DEGRADED` for 15 minutes after. On
 shutdown the analyzer waits up to 12 s for the segment being written to
-close, so a restart hands nothing over. Suricata analyzes each segment as
-before. A manual capture runs beside the lab recording, so live analysis
-keeps following the lab while a test runs; the analyzers pass over the
-manual capture's segments the lab recording covered (it records the same
-packets) and analyze the rest per segment.
+close, so a restart hands nothing over. Suricata follows the same
+recordings live as well ([below](#live-suricata)). A manual capture runs
+beside the lab recording, so live analysis keeps following the lab while a
+test runs; the analyzers pass over the manual capture's segments the lab
+recording covered (it records the same packets) and analyze the rest per
+segment.
+
+### Live Suricata
+
+The Suricata analyzer follows the automatic lab and VPN recordings the same
+way, so alerts and protocol records do not wait for the segment to close: it
+streams the segment being written, converted to one continuous pcap stream,
+into one long-running Suricata per recording (`--runmode single`, reading the
+stream on its standard input) and delivers its EVE records as Suricata writes
+them to `eve.json`. That Suricata runs with the configuration of the analyzer
+profile (`suricata-ot.yaml` with the OT profile) and the hash-bound rules,
+as the isolated parser user, with no capture access. Measured with the real
+Suricata on 10 s segments (`TestLiveSuricataEndToEnd`, run by
+`make analyzer-smoke`), from the record's packets to ingest:
+
+| Record | Segment analysis (median / worst) | Live |
+|---|---|---|
+| Policy alert (HTTP Basic authorization, Telnet) | 11.3 s | 0.35–0.4 s |
+| DNS, HTTP, files | 8.3 s / 11.3 s | 0.2–0.4 s |
+| Flow record | at the segment's end | when the flow times out or ends |
+
+Reading a trace, Suricata's clock moves only with packets; the same idle
+ticks that move live Zeek's clock move Suricata's, so flows time out while
+the lab is quiet. Live Suricata times idle flows out sooner than upstream: an
+idle UDP, ICMP or other flow after 60 s (upstream 300 s), an unanswered TCP
+SYN after 30 s and a closed TCP connection after 10 s; an established TCP
+connection keeps 600 s, since Suricata would not reassemble its stream again
+after a timeout. The per-segment pass ends every flow at its segment's end,
+so a live flow record spans what per-segment records split. Its memory caps
+are below upstream's (flows 64 MiB, streams 64 MiB, reassembly 128 MiB, HTTP
+64 MiB, defragmentation and hosts 16 MiB each) so the long-running process
+stays bounded beside the per-segment Suricata in the 2 GiB container. It is
+restarted at a segment boundary after 64 MiB of EVE output.
+
+Coverage works as for Zeek, through Suricata's own coverage state: a segment
+is covered once a delivery that began 75 s after it was streamed (longer than
+Suricata takes to write the record of a flow that went idle: 60 s and the
+flow manager's few seconds) delivered everything Suricata had written, or
+once Suricata exited after its input ended and everything it wrote was
+delivered. A segment Suricata crashed in, the segments a lagging Suricata
+skipped, those whose records ingest had not taken, and every segment while
+live Suricata is off (`SHAKERPROXY_SURICATA_LIVE=off`) go to the per-segment
+pass, with its per-segment output budget. A Suricata that crashed never
+wrote the flow records of the flows still open; analyzer health counts them
+in `records_dropped`, beside the segments analyzed again
+(`segments_reanalyzed`). Live Suricata replaces each flow's run-specific
+`flow_id` with the deterministic one the per-segment pass derives (the
+endpoints, transport and first record's time), fixed at the flow's first
+record, so all its records share it and a retried delivery is the same
+event. As with Zeek, an event delivered live and again by the per-segment
+pass after a crash is not deduplicated: its payload differs (`pcap_cnt`,
+and a flow's statistics where the flow spans segments). The handoff, not
+the event IDs, keeps each segment delivered once.
 
 Analyzers deliver a segment's events in batches (`POST
 /v1/adapters/{zeek,suricata}/batch`, NDJSON, up to 256 events), and ingest
@@ -299,7 +352,7 @@ the spool accepts events instead of polling once a second.
 ## Zeek coverage
 
 The analyzer runs Zeek with ShakerProxy's site policy
-(`apps/analyzer-worker/zeek/shakerproxy.zeek`). On top of Zeek 8's defaults (which
+(`apps/analyzer-worker/zeek/shakerproxy.zeek`). On top of Zeek's defaults (which
 already include MQTT, QUIC, WebSocket, `weird.log` and `analyzer.log` for
 protocol violations) it adds speculative and failed service names, Community
 ID and MAC addresses to `conn.log`, `known_services.log`, and software

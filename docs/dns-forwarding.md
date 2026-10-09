@@ -35,6 +35,70 @@ a choice for when the lookups themselves matter.
   Android Private DNS set to a specific provider loses internet while this is
   on: set it to Automatic or Off.
 
+### Encrypted-DNS canaries (Firefox, iCloud Private Relay)
+
+Firefox turns on DNS over HTTPS by default in some regions, and iCloud Private
+Relay sends Safari's lookups and connections through Apple's relays. Both ask
+the network first, with a lookup of a *canary* name, and stay off when the
+network's DNS answers it with NXDOMAIN (Mozilla:
+<https://support.mozilla.org/kb/canary-domain-use-application-dnsnet>; Apple:
+"Prepare your network or web server for iCloud Private Relay", which documents
+a negative answer, NXDOMAIN or no answer, for `mask.icloud.com` and
+`mask-h2.icloud.com`). Under the default policy the canaries are forwarded like
+any name, so these devices hide their lookups unless **Block encrypted DNS** is
+on.
+
+The canary setting (`canary_mode`, DNS & HTTPS page "Tell Firefox and Apple
+devices to use plain DNS", `PUT /api/v1/dns-visibility
+{"canary_mode":"signal-opt-out"}`) makes that answer independent of blocking:
+
+- `observe` (the default, and what an upgraded installation keeps): the
+  canaries are forwarded upstream. Nothing changes on upgrade.
+- `signal-opt-out`: `shakerproxy-dnsd` answers `use-application-dns.net`,
+  `mask.icloud.com` and `mask-h2.icloud.com` (with subdomains) with NXDOMAIN.
+  Firefox does not enable its default DoH, and Apple devices turn Private Relay
+  off for this network and show that in their network settings. Their lookups
+  then reach the plain DNS ShakerProxy answers, so every name shows in Traffic.
+  No resolver is blocked: a DoH resolver a person configured on purpose (Firefox
+  "Max Protection", an Android Private DNS hostname) is not affected by the
+  canary.
+
+With **Block encrypted DNS** on the canaries are answered NXDOMAIN either way.
+Every canary answer is a `shakerproxy.dns` lookup with `blocked: true`,
+`blocked_reason: "canary"` and `blocked_domain` the canary (Traffic: "encrypted
+DNS check"). The setting needs plain DNS to reach the forwarder, so it acts
+while **Force plain DNS through ShakerProxy** is on (the default) or for clients
+that use ShakerProxy as their DHCP resolver.
+
+### ECH fallback
+
+The ECH fallback setting (`ech_fallback`, off by default) makes
+`shakerproxy-dnsd` remove the `ech` SvcParam (key 5) from HTTPS and SVCB
+answers it forwards, so a browser has no ECH configuration for the site and
+sends the real server name in its ClientHello. The lookup event carries
+`ech_removed` with the number of records changed. It leaves an answer exactly
+as received whenever editing could break the client instead: the query asked
+for DNSSEC records (DO bit) or the answer carries signatures (a validating
+client would reject the edited record set); a record lists `ech` in its
+`mandatory` parameter; the answer cannot be parsed and packed again, or would
+grow. It cannot reach HTTPS records a device fetches over DNS over HTTPS (turn
+on **Block encrypted DNS**, or decrypt that DoH). See
+[tls-interception.md](tls-interception.md#encrypted-client-hello-ech) for how
+ECH connections are marked.
+
+### Policy file compatibility
+
+`canary_mode` and `ech_fallback` are not written to the policy file
+(`/var/lib/shakerproxy/gatewayd/traffic-policy.json`), which every release reads
+strictly. They live in its sidecar `traffic-policy.extensions.json`, one entry
+per policy revision and digest (the current and the previous policy), and the
+policy file's digest covers only the fields earlier releases know. After a
+rollback to an earlier release, that release loads the policy unchanged and
+runs without these two settings (canaries observed, no ECH editing); a policy
+it applies matches no sidecar entry, so they stay off after upgrading again
+until set again. A sidecar that cannot be read is reported once in the gateway
+log and the policy runs without them.
+
 Every blocked attempt appears in Traffic: refused names as `shakerproxy.dns`
 lookups, refused connections as `shakerproxy.blocked` events (gatewayd reads
 the block rules' NFLOG group 853, at most one event per client, destination
@@ -125,6 +189,10 @@ forwarder's reason and the lab fails open. Ask it yourself with
 `dig @127.0.0.1 -p 1053 CH TXT status.shakerproxy-dnsd`.
 
 ## Lookups in Traffic
+
+DNS over HTTPS that HTTPS decryption covers is recorded the same way, as
+`doh_lookup` events marked "via DoH (decrypted)"; see
+[tls-interception.md](tls-interception.md#dns-over-https-that-shakerproxy-decrypts).
 
 Every query the forwarder answers for a lab device appears in Traffic and in
 the device report as a DNS lookup (kind `shakerproxy.dns`), whether or not a

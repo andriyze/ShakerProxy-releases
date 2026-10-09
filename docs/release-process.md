@@ -151,6 +151,41 @@ file. The signed manifest declares supported Ubuntu versions, architecture,
 profiles, config and database schemas, minimum resources, artifact hashes, and
 the exact seven image digests.
 
+## Base image pins
+
+Every base image is pinned by digest, and each image has one digest across the
+repository. The Dockerfiles in the directories Dependabot watches
+(`.github/dependabot.yml`) are the source of truth: that is the file a
+Dependabot image update changes. The same pin is repeated elsewhere
+(`versions.lock.yaml`, the Makefile, CI, and the integration and netlab
+scripts), and `scripts/sync-image-pins` copies the Dockerfiles' tag and digest
+to every one of those copies, together with the toolchain versions read from
+the `golang` and `node` tags (`go-version` and `node-version` in the
+workflows, `toolchains` in `versions.lock.yaml`).
+
+```bash
+scripts/sync-image-pins          # rewrite every copy to match the Dockerfiles
+scripts/sync-image-pins --check  # what CI runs: names each stale copy, changes nothing
+```
+
+A Dependabot image pull request therefore fails CI until the copies follow it.
+To take one, check out its branch, run `scripts/sync-image-pins`, commit, and
+push (or apply the update on a branch of your own). The script also fails when
+two Dockerfiles pin one image differently or a Dockerfile uses a base without a
+digest. `tests/security/test_beta_safety.py` runs the same check and still
+requires one digest per image for images pinned only outside Dockerfiles
+(postgres, busybox, ubuntu); update those by hand, everywhere at once.
+
+`zeek/zeek` and `jasonish/suricata` are pinned by digest alone, so a new digest
+can be a new engine release, a major one included. Before taking one, run the
+image's version output (`zeek --version`, `suricata -V`), build the analyzer
+image (it compiles the ICSNPP plugins and the IEC 104 Spicy analyzer, and
+validates both Suricata configurations), run `make analyzer-profile-check`,
+and set the version by hand: `engines` in `versions.lock.yaml`,
+`SHAKERPROXY_ANALYZER_SOURCE_VERSION` in `deploy/compose*.yaml` (the version
+the analyzers report, and the Zeek version a staged OT parser pack must be
+built for), the integration scripts, and `THIRD_PARTY_NOTICES.md`.
+
 ## Local candidate build
 
 The local signing key path below is an example and must remain ignored:

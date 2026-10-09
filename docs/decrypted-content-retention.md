@@ -40,6 +40,33 @@ Header names and values are independently bounded. Known credential-bearing
 headers are marked sensitive and remain masked in the Web UI until the local
 administrator explicitly reveals them.
 
+For a WebSocket on a decrypted connection, the first 16 messages of each
+socket keep at most a 256-byte preview of a text message, with credentials
+masked when the event is written, or the first 16 bytes of a binary message
+in hex ([WebSockets](tls-interception.md#websockets)).
+
+### Credentials in URLs
+
+Every HTTP event also keeps the request URL (`http_url`), query string
+included, whether content retention is on or off. Apps put secrets there
+(`?access_token=…`, `api_key=`, `sig=`, `password=`), so the value of each
+query parameter named like a credential is masked before the event is
+written, with the names HTTP bodies are masked by (`password`, `passwd`,
+`pass`, `pwd`, `passcode`, `secret`, `client_secret`, `private_key`, `token`,
+`access_token`, `refresh_token`, `id_token`, `auth_token`, `jwt`, `auth`,
+`authorization`, `api_key`, `key`, `session`, `session_id`, `sig`,
+`signature`, `code`, `otp`, `pin`; in any case, with or without `_` or `-`,
+and as part of a nested name such as `user[password]`). The parameter names
+and the rest of the URL stay, so the request is still recognizable:
+`/v1/items?page=2&access_token=%5Bredacted%5D`. A WebSocket's upgrade request
+is masked the same way. Unlike a sensitive header, a masked value cannot be
+revealed: it is not stored.
+
+The same masking applies to the URLs passive analysis records: Zeek's
+http.log `uri` and `referrer` and Suricata's `http.url` and `http.http_refer`
+are masked when ingest stores the record. Events stored before this release
+keep their URLs as they were; they are not rewritten.
+
 ### Metadata only
 
 For future successfully intercepted HTTP traffic, ShakerProxy retains metadata such
@@ -50,14 +77,16 @@ as:
 - method;
 - scheme;
 - host;
-- path without query parameters;
+- path without query parameters (the URL with its query string, credential
+  values masked, see above);
 - HTTP version;
 - status code;
 - request and response byte counts;
 - TLS interception state;
 - timestamps and event identity.
 
-It does not retain request/response header snapshots or body previews.
+It does not retain request/response header snapshots or body previews. A
+WebSocket's messages keep their direction, type, size and time only.
 
 ## 2. What the setting does not do
 

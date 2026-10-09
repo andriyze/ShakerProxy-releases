@@ -65,7 +65,7 @@ The host capture worker writes rotated PCAPNG files under
 publishes only ring members that dumpcap has safely closed; the member being
 written is never listed. The worker also lets the analyzers read that member
 as soon as dumpcap starts it, and for the automatic recordings live Zeek
-streams it as packets (see
+and live Suricata stream it as packets (see
 [live analysis](protocol-discovery.md#live-analysis-of-the-lab-recording)).
 At completion it records an immutable manifest containing each retained filename, byte size, modification time, and SHA-256
 digest. Zeek and Suricata process closed rotations with durable per-engine
@@ -138,7 +138,7 @@ The control API holds a query-only token that must differ from the ingest
 write token. It has no database URL or analyzer credential. `ingestd` rejects
 the write token on the read endpoint and returns a bounded JSON response over
 the internal network. This is a resumable metadata stream of committed
-events (DNS forwarder lookups, gateway connection events, live Zeek records and
+events (DNS forwarder lookups, gateway connection events, live Zeek and Suricata records and
 per-segment analysis), not deep search or packet streaming.
 
 Saved traffic views use PostgreSQL through a separate typed repository endpoint
@@ -263,7 +263,9 @@ deleted 24 hours after they happened.
 - The parser receives a fixed engine-specific environment allowlist; broker
   secret paths and ingestion configuration are not inherited.
 - Container roots are read-only; Linux capabilities are dropped except the
-  broker's `SETUID`/`SETGID` transition capabilities.
+  broker's `SETUID`/`SETGID` transition capabilities. The broker has no
+  `KILL`: it ends a parser through a helper running under that parser's UID
+  ([architecture](architecture.md)).
 - Engine output uses a no-execute 384 MiB tmpfs and an independent 256 MiB
   application limit. The limits apply to each analyzed segment, not to a
   whole capture: a segment may emit at most 64 event files, 256 MiB and
@@ -301,7 +303,7 @@ deletion intent prevents analyzer replay before and after a crash. Both engine
 acknowledgements are part of the public capture coordinator and retention
 contract.
 The current worker analyzes safely closed ring members, reconciles them with
-the final manifest, and has Zeek follow the automatic lab and VPN recordings
+the final manifest, and has Zeek and Suricata follow the automatic lab and VPN recordings
 live (see [live analysis](protocol-discovery.md#live-analysis-of-the-lab-recording)).
 Raw-log export, per-engine seccomp/AppArmor policy, and broader malicious-PCAP
 corpus coverage remain release work. Immutable start-time retention locks and
@@ -738,7 +740,12 @@ seven-packet HTTP PCAPNG produces normalized Zeek and Suricata events, a
 Suricata starter-policy alert, no quarantine, durable checkpoints, and no
 second-pass replay; ingestd then drains every event into PostgreSQL and its
 event query API (which the Traffic API reads) returns them with the alert.
-CI runs it on every push.
+It then has live Suricata follow a recording still being written in the same
+read-only image: each policy alert must reach ingest before the segment
+holding its packets closes, and the per-segment pass must deliver nothing
+again for the segments live Suricata covered (see
+[live Suricata](protocol-discovery.md#live-suricata)). CI runs it on every
+push.
 
 ## Request / Response of an HTTP event
 

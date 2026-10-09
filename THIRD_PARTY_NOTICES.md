@@ -21,8 +21,8 @@ Dockerfiles listed below, or open an issue and we will provide it.
 
 | Component | Author / maintainer | Upstream | Licence | How ShakerProxy uses it |
 |---|---|---|---|---|
-| Zeek 8.2.1 | The Zeek Project (International Computer Science Institute and contributors) | https://zeek.org | BSD-3-Clause | Base of the Zeek analyzer image (`zeek/zeek`, digest in `versions.lock.yaml`); analyzes closed capture segments into connection, DNS, TLS and HTTP logs |
-| Suricata 8.0.6 | Open Information Security Foundation (OISF) | https://suricata.io | GPL-2.0-only | Base of the Suricata analyzer image (`jasonish/suricata`, digest in `versions.lock.yaml`); flow, protocol and alert analysis with ShakerProxy's own ruleset |
+| Zeek 9.0.0 | The Zeek Project (International Computer Science Institute and contributors) | https://zeek.org | BSD-3-Clause | Base of the Zeek analyzer image (`zeek/zeek`, digest in `versions.lock.yaml`); analyzes closed capture segments into connection, DNS, TLS and HTTP logs |
+| Suricata 8.0.7 | Open Information Security Foundation (OISF) | https://suricata.io | GPL-2.0-only | Base of the Suricata analyzer image (`jasonish/suricata`, digest in `versions.lock.yaml`); flow, protocol and alert analysis with ShakerProxy's own ruleset |
 | CISA ICSNPP parsers: icsnpp-enip, icsnpp-s7comm, icsnpp-opcua-binary, icsnpp-bacnet, icsnpp-modbus, icsnpp-dnp3 | Battelle Energy Alliance, LLC (Idaho National Laboratory) for CISA | https://github.com/cisagov/ICSNPP | BSD-3-Clause | Built into the Zeek analyzer image from the commits pinned in `apps/analyzer-worker/zeek/ot-packages.lock`; parse EtherNet/IP and CIP, S7comm, S7comm-plus and COTP, OPC UA Binary and BACnet/IP, and log Modbus and DNP3 in detail, only with the opt-in OT analyzer profile ([industrial protocols](docs/industrial-protocols.md)). Licence and notice texts ship in the image under `/usr/local/shakerproxy/zeek-ot/licenses` |
 | Suricata container image | Jason Ish | https://github.com/jasonish/docker-suricata | MIT (build files); Suricata and packages under their own licences | Upstream image the Suricata analyzer is built on |
 | mitmproxy 12.2.3 | Aldo Cortesi, Maximilian Hils and contributors | https://mitmproxy.org | MIT | Base of the interception image (`mitmproxy/mitmproxy`); transparent TLS interception with ShakerProxy's addon |
@@ -32,8 +32,8 @@ Dockerfiles listed below, or open an issue and we will provide it.
 | Service | Author / maintainer | Upstream | Licence | How ShakerProxy uses it |
 |---|---|---|---|---|
 | PostgreSQL 16.15 | PostgreSQL Global Development Group | https://www.postgresql.org | PostgreSQL License | Event and inventory database (`postgres`, digest-pinned) |
-| Caddy 2.10.2 | Matt Holt and the Caddy authors | https://caddyserver.com | Apache-2.0 | HTTPS edge in front of the web UI and API |
-| nginx 1.29.1 | F5, Inc. and NGINX contributors | https://nginx.org | BSD-2-Clause | Serves the built web UI inside its image |
+| Caddy 2.11.4 | Matt Holt and the Caddy authors | https://caddyserver.com | Apache-2.0 | HTTPS edge in front of the web UI and API |
+| nginx 1.31.0 | F5, Inc. and NGINX contributors | https://nginx.org | BSD-2-Clause | Serves the built web UI inside its image |
 | Distroless static (Debian 12) | Google LLC | https://github.com/GoogleContainerTools/distroless | Apache-2.0; bundled Debian files under their own licences | Minimal runtime base for the Go service images |
 | Alpine Linux base (in the Caddy and nginx images) | Alpine Linux contributors | https://alpinelinux.org | Per package (musl libc: MIT; BusyBox: GPL-2.0) | Base operating system of those upstream images |
 

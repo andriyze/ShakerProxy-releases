@@ -10,8 +10,8 @@ each dependency's version is pinned and what remains to be done before a public 
 | Go modules linked into shipped binaries | pgx, MCP Go SDK, jsonschema-go, segmentio, uritemplate, golang.org/x | `go.mod`, `go.sum` | Verified from each module's `LICENSE`: MIT, BSD-3-Clause; the MCP SDK is MIT transitioning to Apache-2.0 and its upstream `LICENSE` is preserved |
 | Public Suffix List (via golang.org/x/net) | Registrable-domain grouping in device reports | `go.mod` (`golang.org/x/net` v0.59.0) | MPL-2.0 data embedded in a BSD-3-Clause module |
 | Web UI runtime (react, react-dom, scheduler) | Shipped UI bundle | `apps/web-ui/package-lock.json` | MIT (verified from the lock file); build-time packages are not shipped |
-| Zeek | Passive analysis image | `versions.lock.yaml` (8.2.1 digest) | BSD-3-Clause |
-| Suricata | IDS/flow analysis image | `versions.lock.yaml` (8.0.6 digest) | GPL-2.0-only; each release must publish or offer the corresponding source |
+| Zeek | Passive analysis image | `versions.lock.yaml` (9.0.0 digest) | BSD-3-Clause |
+| Suricata | IDS/flow analysis image | `versions.lock.yaml` (8.0.7 digest) | GPL-2.0-only; each release must publish or offer the corresponding source |
 | mitmproxy | TLS interception image | `versions.lock.yaml` (12.2.3 digest) | MIT |
 | PostgreSQL, Caddy, nginx, distroless | Application runtime images | `versions.lock.yaml`, Dockerfiles | PostgreSQL License, Apache-2.0, BSD-2-Clause, Apache-2.0 |
 | Ubuntu host packages (Kea, hostapd, radvd, dumpcap, Docker, …) | Host runtime, installed from Ubuntu's archive | `packaging/deb/control.in` | Their own licences; not redistributed by ShakerProxy |

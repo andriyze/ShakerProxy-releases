@@ -46,7 +46,8 @@ signal per part of the path from packets to Traffic:
   so), and recording files that never reached the analyzers;
 - live connection and blocked encrypted-DNS events: whether each runs, its
   kernel buffer overruns and the events the spool could not take;
-- live analysis: its lag and the records it could not confirm delivered;
+- live analysis, live Zeek and live Suricata each: whether it follows or is
+  restarting, its lag and the records it could not confirm delivered;
 - Zeek and Suricata: stopped, segments skipped over the analysis budget,
   segments the recording removed before analysis (missed), and an analyzer
   that runs another analyzer profile than the configured one (the industrial
@@ -54,9 +55,12 @@ signal per part of the path from packets to Traffic:
   for Zeek with the OT profile, its parser pack and plugins, and the report's
   `analyzers` carry `profile`, `configured_profile`, `parser_pack`,
   `ot_plugins` and `parser_error`;
-- event storage: drain lag, a paused drain, the database, quarantine, and the
-  event database's disk (low space, history deleted early, or a disk filled
-  by something else, which is a gap);
+- event storage: drain lag, a paused drain, the database, quarantine
+  (with how many of the set-aside records the event database refused and
+  can be replayed, and the command, see
+  [Set-aside records](#set-aside-records)), and the event database's disk
+  (low space, history deleted early, or a disk filled by something else,
+  which is a gap);
 - device discovery: the device inventory's latest refresh;
 - decryption and policy: the decryption service down, emergency bypass, a
   traffic policy that could not start, unfinished startup network recovery,
@@ -75,6 +79,39 @@ seconds; `shakerproxy status` prints it after the gateway's state (it needs
 tool include it as `visibility`, and a finished coverage check keeps the
 report from its end, so a probe it missed can be explained by a gap at the
 time. The MCP `system_status` limitations name each gap in fixed words.
+
+## Set-aside records
+
+A record the event database refuses (a value it cannot hold, a constraint)
+would block every record after it, so ingest sets it aside: it is moved whole
+from the spool's `pending/` to `rejected/`, the rest drains, and the record
+is not in Traffic. From this release the reason is kept beside it, in
+`rejected-reasons/<record>.json` (releases before it ignore that directory).
+A newer release may store what an older one could not: 0.1.0-beta.43 replaces
+the NUL characters PostgreSQL refuses, which had set aside Suricata mDNS
+records. Malformed input is quarantined instead (only a bounded prefix is
+kept) and cannot be replayed.
+
+```text
+sudo shakerproxy ingest rejected                     # counts by kind, day received and why
+sudo shakerproxy ingest rejected replay --kind suricata.mdns
+sudo shakerproxy ingest rejected delete --before 2026-10-01
+```
+
+`replay` moves the selected records back to `pending/`, at most 256 at a
+time and only while fewer than 4,000 records are pending, so they are stored
+through this release's write path: Zeek and Suricata records pass their
+adapter again (NUL replacement, URL credential masking; the event ID may
+change), others have their NUL characters replaced. One refused again is set
+aside again with the new reason, and one whose capture or device/time
+selection was deleted is removed. `delete` lists what it would remove and
+asks for `DELETE` (or `--yes`). `--kind` selects an event kind and
+`--before` records received before a time (RFC 3339, or a date). The command
+runs `ingestd rejected` inside the ingest container as the container's own
+user (`docker compose exec`), so it touches the spool with exactly ingestd's
+access. Every run is appended to the spool's audit log,
+`/var/lib/shakerproxy/spool/rejected-audit.jsonl` (who ran it, the filter,
+what it did), rotated past 1 MiB.
 
 ## Host diagnostics
 
