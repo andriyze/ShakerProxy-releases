@@ -297,6 +297,24 @@ checkpoint and active progress file) that 0.1.0-beta.39 ignores, so after a
 `rollback` or a failed `update` its analyzers start and carry on from the
 state the newer release left.
 
+An update that moves Zeek or Suricata to another version keeps the analyzer
+state too: the analyzers log `analyzer engine upgraded from X to Y` once,
+record the new version in `status.json`, and carry on without analyzing
+again what the previous version analyzed. A signed OT parser pack built for
+the previous Zeek is refused by the new one, and the analyzer loads its
+built-in parsers until a pack for the new Zeek is activated
+([industrial protocols](industrial-protocols.md)). Up to 0.1.0-beta.46 an
+analyzer stopped on state that named another engine version, so the update
+to 0.1.0-beta.46 (Suricata 8.0.6 to 8.0.7, Zeek 8.2.1 to 9.0.0) failed and
+was put back on every appliance with analyzer state; update straight to a
+later release. Those releases cannot be changed, so a `rollback` (or a failed
+`update` that puts one back) from 0.1.0-beta.47 or later first sets the
+engine versions in `/var/lib/shakerproxy/zeek/status.json` and
+`/var/lib/shakerproxy/suricata/status.json` to the ones the older release
+runs (`shakerproxy-app downgrade-analyzer-state`, read from its compose
+file). A rollback whose state cannot be rewritten is refused and leaves the
+current release running.
+
 Before rolling back to 0.1.0-beta.39 or earlier, delete any saved view that
 filters on router logs (`source:NETWORK_GEAR`) or a flow (`flow.id`): those
 releases cannot read such a view, so their Saved views list fails and the view
@@ -377,7 +395,11 @@ A real install, update, repair, or rollback appends its output to
 `/var/log/shakerproxy/install.log`. A failed one also creates a mode-`0640`
 `/var/log/shakerproxy/install-failure-<timestamp>-<pid>.tar.gz` containing only
 that log and a bounded host summary (OS, kernel, interface names, Docker
-versions, failed unit names, and `shakerproxy doctor`). It never collects
+versions, failed unit names, and `shakerproxy doctor`). When the failed
+release's containers had started, it also holds, under `containers/`, the
+last 200 log lines and the state with recent health check output
+(`docker inspect` `.State`) of each application container that had exited or
+was not healthy, recorded before the previous release replaced them. It never collects
 environment variables, configuration files, enrollment tokens, service
 credentials, packet data, TLS keys, or CA private keys.
 
